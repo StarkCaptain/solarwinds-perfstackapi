@@ -54,7 +54,7 @@ function Enable-TrustAllCertificates {
   Get-BasicAuthCreds -Username 'domain\username' -Password 'P@ssw0rd'
 #>
 
-Function Get-BasicAuthCreds {
+Function New-BasicAuthCreds {
     param(
         [Parameter(Mandatory=$True,
         ValueFromPipeline=$True,
@@ -174,12 +174,14 @@ Function New-SolarWindsSession {
   Only required if your solarwinds website is not running on the default port of 443
   .PARAMETER Limit
   Returns a subset of objects from the request. Expects an integer ranging from 0 to unkown number. Default value is 0 which returns all nodes.
-  You cannot specify the Filter or ShowAttributes parameters with this parameter.
+  This parameter may not work for all endpoints
+  You cannot specify the ShowAttributes parameters with this parameter.
   .PARAMETER Filter
   Returns a subset of objects based on an attribute. Expects a string in the format of 'attribute=value'. 
   Specify multiple attributes seperated by the & symbol 'attribute=value&attribute2=value'
+  This parameter may not work for all endpoints
   To see current attributes run Get-Nodes -ShowAttributes
-  You cannot specify the Limit or ShowAttributes parameters with this parameter. 
+  You cannot specify the ShowAttributes parameters with this parameter. 
   .PARAMETER ShowAttributes
   Shows an example of the attributes you can filter on. You cannot specify the Limit or Filter parameters with this parameter. 
   .EXAMPLE
@@ -236,12 +238,11 @@ Function Get-SWObjects{
         ValueFromPipeline=$True,
         ValueFromPipelineByPropertyName=$True)]
         [ValidateNotNull()]
-        [string]$Path,
+        [string]$EndPoint,
 
         [Parameter(ParameterSetName = 'ParamShowAtrribs')]
         [switch]$ShowAttributes = $false,
 
-        [Parameter(ParameterSetName = 'ParamLimit')]
         [int]$Limit = 0,
 
         [Parameter(ParameterSetName = 'ParamFilterAtrribs')]
@@ -254,20 +255,20 @@ Function Get-SWObjects{
     begin {
 
         #Cleanup Path Variable
-        $Path = ($Path + '/').Replace('//','/')
+        $EndPoint = $EndPoint.Replace('//','/')
 
         Write-Verbose 'Formatting ServerName to Base solarwinds address for establishing a session'
         
-        $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$Path/?length=$Limit&offset=0&type=Orion.Nodes"
+        $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$EndPoint/?length=$Limit&offset=0"
         
         If($Filter){
             Write-Verbose 'Filter Parameter Was Specified, Formatting URI'
-            $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$Path/?$Filter&offset=0&type=Orion.Nodes"
+            $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$EndPoint/?length=$Limit&offset=0$Filter"
         }
 
         If($ShowAttributes){
             Write-Verbose 'ShowAttributes Parameter Was Specified, Formatting URI'
-            $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$Path/?length=1&offset=0&type=Orion.Nodes"
+            $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$EndPoint/?length=$Limit&offset=0"
         }
 
         #Cleanup URI  Variable
@@ -303,7 +304,7 @@ Function Get-SWObjects{
 
 <#
   .SYNOPSIS
-  Gets List of Nodes from the SolarWinds API
+  Gets a list of Nodes from the SolarWinds API
   .DESCRIPTION
   Returns a list of nodes from the /api2/perfstack/entities API endpoint
   .PARAMETER ServerName
@@ -345,7 +346,6 @@ Function Get-SWObjects{
   Get nodes based on multiple filters. Below will return all nodes with srv in the displayName and have windows in the description
   Get-SWNodes -ServerName solarwinds.test.com -WebSession $WebSession -Filter 'displayName=%srv%&description=%windows%'
 
-
 #>
 
 Function Get-SWNodes{
@@ -384,20 +384,20 @@ Function Get-SWNodes{
     begin {
 
         #Cleanup Path Variable
-        $Path = ($Path + '/').Replace('//','/')
+        $EndPoint = ($EndPoint + '/').Replace('//','/')
 
         Write-Verbose 'Formatting ServerName to Base solarwinds address for establishing a session'
         
-        $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$Path/?length=$Limit&offset=0&type=Orion.Nodes"
+        $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$EndPoint/?length=$Limit&offset=0&type=Orion.Nodes"
         
         If($Filter){
             Write-Verbose 'Filter Parameter Was Specified, Formatting URI'
-            $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$Path/?$Filter&offset=0&type=Orion.Nodes"
+            $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$EndPoint/?$Filter&offset=0&type=Orion.Nodes"
         }
 
         If($ShowAttributes){
             Write-Verbose 'ShowAttributes Parameter Was Specified, Formatting URI'
-            $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$Path/?length=1&offset=0&type=Orion.Nodes"
+            $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$EndPoint/?length=1&offset=0&type=Orion.Nodes"
         }
 
         #Cleanup URI  Variable
@@ -430,10 +430,146 @@ Function Get-SWNodes{
     }
 }
 
+<#
+  .SYNOPSIS
+  Gets a list of node related metrics 
+  .DESCRIPTION
+  Returns a list of all metrics from the current node. 
+  .PARAMETER ServerName
+  The solarwinds FQDN servername. 
+  .PARAMETER WebSession
+  An existing Microsoft.PowerShell.Commands.WebRequestSession. Use the New-SolarWindsSession to generate a web session
+  .PARAMETER NodeID
+  The NodeID of the Node you want to retrieve metrics from. This needs to be in the API format. 0_Orion.Nodes_NodeID where NodeID is the NodeID number (0_Orion.Nodes_2055)
+  .PARAMETER ServerPort
+  Only required if your solarwinds website is not running on the default port of 443
+  .EXAMPLE
+  Get-SWNodeMetrics -ServerName solarwinds.f5net.com -WebSession $WebSession -NodeID 0_Orion.Nodes_2055
+  .EXAMPLE
 
+
+#>
 Function Get-SWNodeMetrics{
+    [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Low',DefaultParametersetName='ParamDefault')]
+    param(
+        [Parameter(Mandatory=$True)]
+        [ValidateNotNull()]
+        [Alias('Server')]
+        [Alias('SolarWindsServer')]
+        [string]$ServerName,
 
-    
-    
+        [Parameter(Mandatory=$True)]
+        [ValidateNotNull()]
+        [Microsoft.PowerShell.Commands.WebRequestSession]$WebSession,
+
+        [Parameter(Mandatory=$True)]
+        [ValidateNotNull()]
+        [string]$NodeID,
+
+        [Alias('Path')]
+        [string]$Endpoint = 'metrics/',
+
+        [Alias('Port')]
+        [string]$ServerPort = '443'
+    )
+
+    begin {
+
+        #Cleanup Path Variable
+        $EndPoint = ($EndPoint + '/').Replace('//','/')
+
+        Write-Verbose 'Formatting ServerName to Base solarwinds address for establishing a session'
+        
+        $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/entities/$NodeID/$EndPoint"
+
+        #Cleanup URI  Variable
+        $URI  = "https://$($URI.Replace('//','/'))"
+    }
+
+    process {
+        try{
+            Write-Verbose "Attempting Connection to $URI"
+            If ($pscmdlet.ShouldProcess($URI)){
+
+                $Request = Invoke-RestMethod -Method Get -Uri $URI -ContentType 'application/json' -WebSession $WebSession
+            }
+
+        }
+        catch{
+
+            Write-Error $_
+
+        }
+
+    }
+    End{
+
+        return $Request
+    }
 
 }
+
+Function Get-SWMetricStats{
+    [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Low',DefaultParametersetName='ParamDefault')]
+    param(
+        [Parameter(Mandatory=$True)]
+        [ValidateNotNull()]
+        [Alias('Server')]
+        [Alias('SolarWindsServer')]
+        [string]$ServerName,
+
+        [Parameter(Mandatory=$True)]
+        [ValidateNotNull()]
+        [Microsoft.PowerShell.Commands.WebRequestSession]$WebSession,
+
+        [Parameter(Mandatory=$True)]
+        [ValidateNotNull()]
+        [Alias('id')]
+        [string]$MetricID,
+
+        [Alias('Path')]
+        [string]$Endpoint = 'metrics/',
+
+        [Alias('Port')]
+        [string]$ServerPort = '443'
+    )
+
+    begin {
+        #Get Current Date Time in UTC
+        $EndTime = (get-date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+        $StartTime = (get-date).AddHours(-1).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+
+        #Cleanup Path Variable
+        $EndPoint = ($EndPoint + '/').Replace('//','/')
+
+        Write-Verbose 'Formatting ServerName to Base solarwinds address for establishing a session'
+        
+        $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$EndPoint/$MetricID/?endTime=$EndTime&resolution=60&startTime=$StartTime"
+
+        #Cleanup URI  Variable
+        $URI  = "https://$($URI.Replace('//','/'))/"
+
+    }
+
+    process {
+        try{
+            Write-Verbose "Attempting Connection to $URI"
+            If ($pscmdlet.ShouldProcess($URI)){
+
+                $Request = Invoke-RestMethod -Method Get -Uri $URI -ContentType 'application/json' -WebSession $WebSession
+            }
+
+        }
+        catch{
+
+            Write-Error $_
+
+        }
+
+    }
+    End{
+        return $Request
+    }
+
+}
+

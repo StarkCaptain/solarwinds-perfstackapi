@@ -11,6 +11,7 @@ $global:APIRootPath = 'api2/perfstack'
   Enable-SelfSignedCerts
 
 #>
+
 function Enable-TrustAllCertificates {
     [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Low')]
     param()
@@ -52,6 +53,7 @@ function Enable-TrustAllCertificates {
   .EXAMPLE
   Get-BasicAuthCreds -Username 'domain\username' -Password 'P@ssw0rd'
 #>
+
 Function Get-BasicAuthCreds {
     param(
         [Parameter(Mandatory=$True,
@@ -74,7 +76,7 @@ Function Get-BasicAuthCreds {
 
 <#
   .SYNOPSIS
-  Creates a new solarwinds rest API session
+  Creates a new SolarWinds rest API session
   .DESCRIPTION
   Uses the invoke-restmethod to create an API session the solarwinds APIv2 interface
   .PARAMETER ServerName
@@ -298,7 +300,6 @@ Function Get-SWObjects{
         return $Request
     }
 }
-
 
 <#
   .SYNOPSIS

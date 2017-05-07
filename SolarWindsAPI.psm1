@@ -81,7 +81,7 @@ Function New-BasicAuthCreds {
   .PARAMETER ServerName
   The solarwinds FQDN servername. 
   .PARAMETER Credential
-  Accepts a single Base64Encoded Credential. Use the New-BasicAuthCreds Function to generate a credential
+  Accepts a single Base64Encoded Credential. Use the Get-BasicAuthCreds Function to generate a credential
   .PARAMETER ServerPort
   Only required if your solarwinds website is not running on the default port of 443
   .EXAMPLE
@@ -147,12 +147,6 @@ Function New-SWSession {
                 $SWSession.Cookies.Add($Cookie);
             }
 
-            #Create a new PSObject to store session data
-            $Object = New-Object PSObject -Property @{
-                WebSession = $SWSession
-                ServerName = $ServerName
-                ServerPort = $ServerPort
-            }
         }
         catch{
 
@@ -160,15 +154,15 @@ Function New-SWSession {
 
         }
 
-        return $Object
+        return $SWSession
     }
 }
 
 <#
   .SYNOPSIS
-  Gets a list of entities from an API endpoint Path
+  Gets a list of objects from an API endpoint Path
   .DESCRIPTION
-  This is a univeral function that returns a list of objects from the entities API endpoint. 
+  This is a univeral function that returns a list of objects an API endpoint. 
   .PARAMETER ServerName
   The solarwinds FQDN servername. 
   .PARAMETER WebSession
@@ -177,31 +171,18 @@ Function New-SWSession {
   Specify the API Endpoint Path. (entities/states/, entities/types, entities, etc...)
   .PARAMETER ServerPort
   Only required if your solarwinds website is not running on the default port of 443
-  .PARAMETER Offset
-  The offset parameter controls the starting point within the collection of resource results. 
-  For example, if you have a collection of 15 items to be retrieved from a resource and you specify Length=5, 
-  you can retrieve the entire set of results in 3 successive requests by varying the offset value: offset=0, offset=5, and offset=10. 
-  Note that the first item in the collection is retrieved by setting a zero offset..
-  .PARAMETER Length
-  The Length parameter controls the maximum number of items that may be returned for a single request. 
-  This parameter can be thought of as the page size. If no length is specified, the system defaults to a length of 0 or all records.
-  .PARAMETER OrderBy
-  The orderBy parameter can be used to order results based on a specific attribute
-  .PARAMETER Sort
-  The Sort parameter can be used to sort results based on a specific attribute
-  .PARAMETER DisplayName
-  The displayName parameter can be used to filter results basde on the displayname attribute. Wildcards can be represented by a % sign.
-  .PARAMETER status
-  The Status parameter can be used to sort results based on the status of an object
-  .PARAMETER type
-  The Type parameter can be used to sort results based on the type of an object. This useful for only returning nodes for example. 
-  ?length=20&offset=5&sort=description&type=Orion.Nodes
+  .PARAMETER Limit
+  Returns a subset of objects from the request. Expects an integer ranging from 0 to unkown number. Default value is 0 which returns all nodes.
+  This parameter may not work for all endpoints
+  You cannot specify the ShowAttributes parameters with this parameter.
+  .PARAMETER Filter
   Returns a subset of objects based on an attribute. Expects a string in the format of 'attribute=value'. 
   Specify multiple attributes seperated by the & symbol 'attribute=value&attribute2=value'
-
+  This parameter may not work for all endpoints
   To see current attributes run Get-Nodes -ShowAttributes
+  You cannot specify the ShowAttributes parameters with this parameter. 
   .PARAMETER ShowAttributes
-  Shows an example of the attributes you can filter on. 
+  Shows an example of the attributes you can filter on. You cannot specify the Limit or Filter parameters with this parameter. 
   .EXAMPLE
   Get All Nodes
   Get-SWObjects -ServerName solarwinds.test.com -WebSession $WebSession -Path 'entities/'
@@ -238,27 +219,22 @@ Function New-SWSession {
 Function Get-SWObjects{
     [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Low',DefaultParametersetName='ParamDefault')]
     param(
-        [Parameter(Mandatory=$false,
+        [Parameter(Mandatory=$True,
         ValueFromPipeline=$True,
         ValueFromPipelineByPropertyName=$True)]
         [ValidateNotNull()]
         [Alias('Server')]
         [Alias('SolarWindsServer')]
         [string]$ServerName,
-        
-        [Parameter(Mandatory=$false,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True)]
-        [Alias('Port')]
-        [string]$ServerPort = '443',
 
-        [Parameter(Mandatory=$false,
+        [Parameter(Mandatory=$True,
         ValueFromPipeline=$True,
         ValueFromPipelineByPropertyName=$True)]
         [ValidateNotNull()]
         [Microsoft.PowerShell.Commands.WebRequestSession]$WebSession,
 
         [Parameter(Mandatory=$True,
+        ValueFromPipeline=$True,
         ValueFromPipelineByPropertyName=$True)]
         [ValidateNotNull()]
         [string]$EndPoint,
@@ -269,17 +245,13 @@ Function Get-SWObjects{
         [int]$Limit = 0,
 
         [Parameter(ParameterSetName = 'ParamFilterAtrribs')]
-        [string]$Filter
+        [string]$Filter,
+
+        [Alias('Port')]
+        [string]$ServerPort = '443'
     )
 
     begin {
-       
-        Write-Verbose "Parameter Set: $($PSCmdlet.ParameterSetName)"
-    }
-
-    process {
-        
-        Write-Verbose $Temp.Websession.headers
 
         #Cleanup Path Variable
         $EndPoint = $EndPoint.Replace('//','/')
@@ -300,7 +272,10 @@ Function Get-SWObjects{
 
         #Cleanup URI  Variable
         $URI  = "https://$($URI.Replace('//','/'))"
-        
+
+    }
+
+    process {
         try{
             Write-Verbose "Attempting Connection to $URI"
             If ($pscmdlet.ShouldProcess($URI)){
@@ -330,7 +305,7 @@ Function Get-SWObjects{
   .SYNOPSIS
   Gets a list of Nodes from the SolarWinds API
   .DESCRIPTION
-  Returns a list of nodes from the /api2/perfstack/entities API endpoint uses the filter type=Orion.Nodes to only display nodes
+  Returns a list of nodes from the /api2/perfstack/entities API endpoint
   .PARAMETER ServerName
   The solarwinds FQDN servername. 
   .PARAMETER WebSession
@@ -375,21 +350,15 @@ Function Get-SWObjects{
 Function Get-SWNodes{
     [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Low',DefaultParametersetName='ParamDefault')]
     param(
-        [Parameter(Mandatory=$false,
+        [Parameter(Mandatory=$True,
         ValueFromPipeline=$True,
         ValueFromPipelineByPropertyName=$True)]
         [ValidateNotNull()]
         [Alias('Server')]
         [Alias('SolarWindsServer')]
         [string]$ServerName,
-        
-        [Parameter(Mandatory=$false,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True)]
-        [Alias('Port')]
-        [string]$ServerPort = '443',
 
-        [Parameter(Mandatory=$false,
+        [Parameter(Mandatory=$True,
         ValueFromPipeline=$True,
         ValueFromPipelineByPropertyName=$True)]
         [ValidateNotNull()]
@@ -405,15 +374,13 @@ Function Get-SWNodes{
         [string]$Filter,
 
         [Alias('Path')]
-        [string]$Endpoint = 'entities/'
+        [string]$Endpoint = 'entities/',
 
+        [Alias('Port')]
+        [string]$ServerPort = '443'
     )
 
     begin {
-
-    }
-
-    process {
 
         #Cleanup Path Variable
         $EndPoint = ($EndPoint + '/').Replace('//','/')
@@ -434,7 +401,9 @@ Function Get-SWNodes{
 
         #Cleanup URI  Variable
         $URI  = "https://$($URI.Replace('//','/'))"
+    }
 
+    process {
         try{
             Write-Verbose "Attempting Connection to $URI"
             If ($pscmdlet.ShouldProcess($URI)){
@@ -479,23 +448,13 @@ Function Get-SWNodes{
 Function Get-SWNodeMetrics{
     [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Low',DefaultParametersetName='ParamDefault')]
     param(
-        [Parameter(Mandatory=$false,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True)]
+        [Parameter(Mandatory=$True)]
         [ValidateNotNull()]
         [Alias('Server')]
         [Alias('SolarWindsServer')]
         [string]$ServerName,
-        
-        [Parameter(Mandatory=$false,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True)]
-        [Alias('Port')]
-        [string]$ServerPort = '443',
 
-        [Parameter(Mandatory=$false,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True)]
+        [Parameter(Mandatory=$True)]
         [ValidateNotNull()]
         [Microsoft.PowerShell.Commands.WebRequestSession]$WebSession,
 
@@ -504,16 +463,14 @@ Function Get-SWNodeMetrics{
         [string]$NodeID,
 
         [Alias('Path')]
-        [string]$Endpoint = 'metrics/'
+        [string]$Endpoint = 'metrics/',
 
+        [Alias('Port')]
+        [string]$ServerPort = '443'
     )
 
     begin {
 
-    }
-
-    process {
-        
         #Cleanup Path Variable
         $EndPoint = ($EndPoint + '/').Replace('//','/')
 
@@ -523,7 +480,9 @@ Function Get-SWNodeMetrics{
 
         #Cleanup URI  Variable
         $URI  = "https://$($URI.Replace('//','/'))"
+    }
 
+    process {
         try{
             Write-Verbose "Attempting Connection to $URI"
             If ($pscmdlet.ShouldProcess($URI)){
@@ -577,23 +536,13 @@ Function Get-SWNodeMetrics{
 Function Get-SWMeasurement{
     [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Low',DefaultParametersetName='ParamDefault')]
     param(
-        [Parameter(Mandatory=$false,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True)]
+        [Parameter(Mandatory=$True)]
         [ValidateNotNull()]
         [Alias('Server')]
         [Alias('SolarWindsServer')]
         [string]$ServerName,
-        
-        [Parameter(Mandatory=$false,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True)]
-        [Alias('Port')]
-        [string]$ServerPort = '443',
 
-        [Parameter(Mandatory=$false,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True)]
+        [Parameter(Mandatory=$True)]
         [ValidateNotNull()]
         [Microsoft.PowerShell.Commands.WebRequestSession]$WebSession,
 
@@ -605,15 +554,13 @@ Function Get-SWMeasurement{
         [switch]$Latest,
 
         [Alias('Path')]
-        [string]$Endpoint = 'metrics/'
+        [string]$Endpoint = 'metrics/',
+
+        [Alias('Port')]
+        [string]$ServerPort = '443'
     )
 
     begin {
-
-    }
-
-    process {
-
         #Get Current Date Time in UTC
         $EndTime = (get-date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
         $StartTime = (get-date).AddHours(-1).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
@@ -628,6 +575,9 @@ Function Get-SWMeasurement{
         #Cleanup URI  Variable
         $URI  = "https://$($URI.Replace('//','/'))/"
 
+    }
+
+    process {
         try{
             Write-Verbose "Attempting Connection to $URI"
             If ($pscmdlet.ShouldProcess($URI)){

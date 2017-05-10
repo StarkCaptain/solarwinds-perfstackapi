@@ -222,6 +222,13 @@ Function New-SWSession {
   Get all entities that are Exchange APM Applications
   $WebSession | Get-SWEntities -type Orion.APM.Exchange.Application
   .EXAMPLE
+  Get all entities that have a displayname of test.test.local
+  $WebSession | Get-SWEntities -DisplayName test.test.local
+
+  Get all entities that have a displayname beginning with test
+  $WebSession | Get-SWEntities -DisplayName test%
+
+  .EXAMPLE
   The below examples work with returning a entities based on a status. 
 
   Get the first 10 entities that are down

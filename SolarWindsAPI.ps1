@@ -234,15 +234,6 @@ Function New-SWSession {
   Get the first 10 entities that are down
   $WebSession | Get-SWEntities -status 2
 
-  .EXAMPLE
-  The below examples sort and OrderBy the records returned. 
-
-  Get the first 100 nodes, sort by status
-  $WebSession | Get-SWEntities -type Orion.Nodes -sort status
-
-  Get the first 100 nodes, groupby description
-  $WebSession | Get-SWEntities -type Orion.Nodes -OrderBy description
-
 #>
 
 Function Get-SWEntities{
@@ -276,12 +267,6 @@ Function Get-SWEntities{
 
         [Parameter(ValueFromPipelineByPropertyName=$True,ParameterSetName = 'ParamQuery')]
         [int]$Length = 10,
-
-        [Parameter(ValueFromPipelineByPropertyName=$True,ParameterSetName = 'ParamQuery')]
-        [string]$OrderBy,
-
-        [Parameter(ValueFromPipelineByPropertyName=$True,ParameterSetName = 'ParamQuery')]
-        [string]$Sort,
 
         [Parameter(ValueFromPipelineByPropertyName=$True,ParameterSetName = 'ParamQuery')]
         [string]$DisplayName,
@@ -318,8 +303,6 @@ Function Get-SWEntities{
             If ($DisplayName){$URIParams.add('DisplayName', $DisplayName)}
             If ($PSBoundParameters.ContainsKey('Status')){$URIParams.add('Status', $status)}
             If ($Type){$URIParams.add('Type', $type)}
-            If ($OrderBy){$URIParams.add('OrderBy', $OrderBy)}
-            If ($Sort){$URIParams.add('Sort', $Sort)}
 
             #Format URIParams to single line
             $URIParams = ($URIParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)"}) -join '&'

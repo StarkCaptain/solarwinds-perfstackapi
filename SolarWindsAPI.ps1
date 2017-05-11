@@ -344,14 +344,20 @@ Function Get-SWEntities{
   .PARAMETER ServerPort
   Only required if your solarwinds website is not running on the default port of 443
   .PARAMETER EntityId
-  .PARAMETER Resolution
-  .PARAMETER StartDate
-  .PARAMETER EndDate
+  The unique entityID of the entity you want to get metrics from. 
+  .PARAMETER Count
+  When Count is specified this will return the available measurements from each metric of the entity. A count of 1 will return the most recent measurement.
+  .Example
+  Returns all metrics for a specified entity
+  $WebSession | Get-SWEntityMetrics -EntityId 0_Orion.Nodes_2055
+  .Example
+  Returns the first measurement for each metric for a specified entity
+  $WebSession | Get-SWEntityMetrics -EntityId 0_Orion.Nodes_2055 -Count 1
 
 #>
 
 Function Get-SWEntityMetrics{
-    [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Low')]
+    [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Low',DefaultParametersetName='ParamDefault')]
     param(
         [Parameter(Mandatory=$true,ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
         [ValidateNotNull()]
@@ -373,17 +379,116 @@ Function Get-SWEntityMetrics{
 
         [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
         [ValidateNotNull()]
+        [int]$Count
+    )
+
+    begin {
+       
+        # Originally had the Endpoint cleanup up in here, however ValueFromPipelineByPropertyName, ValueFromPipeline, and ParameterSets do not get proccessed in the begin block. 
+        # Also Didn't feel like going through the trouble of creating a $InputObject, leaving this in place for notes
+    }
+
+    process {
+
+        #Cleanup Path Variable
+        $EndPoint = 'entities'
+        $EndPoint = $EndPoint.Replace('//','/')
+
+        Write-Verbose $PSBoundParameters.GetEnumerator()
+        $URIParams = @{} 
+
+        #Adding Parameters to URIParams
+        If ($PSBoundParameters.ContainsKey('Count')){$URIParams.add('Count', $Count)}
+ 
+        #Format URIParams to single line
+        $URIParams = ($URIParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)"}) -join '&'
+        If ($URIParams){$URIParams = "?$URIParams"}
+
+        Write-Verbose $URIParams
+
+        $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$EndPoint/$EntityId/metrics/$URIParams"
+
+        #Cleanup URI  Variable
+        $URI  = "https://$($URI.Replace('//','/'))"
+        
+        try{
+            Write-Verbose "Attempting Connection to $URI"
+            If ($pscmdlet.ShouldProcess($URI)){
+                $Request = Invoke-RestMethod -Method Get -Uri $URI -ContentType 'application/json' -WebSession $WebSession
+            }
+        }
+        catch{
+            Write-Error $_
+        }
+    }
+    End{
+        return $Request
+    }
+}
+
+<#
+  .SYNOPSIS
+  Gets measurements from a specific metric entity id
+  .DESCRIPTION
+  Gets measurements from a specific metric entity id from the metrics/ API endpoint.
+  .PARAMETER ServerName
+  The solarwinds FQDN servername. 
+  .PARAMETER WebSession
+  An existing Microsoft.PowerShell.Commands.WebRequestSession. Use the New-SWSession to generate a web session
+  .PARAMETER ServerPort
+  Only required if your solarwinds website is not running on the default port of 443
+  .PARAMETER EntityId
+  The unique entityID of the entity you want to get metrics from. 
+  .PARAMETER MetricId
+  The unique entityID of the entity you want to get metrics from. 
+  .PARAMETER Count
+  When Count is specified this will return the available measurements from each metric of the entity. A count of 1 will return the most recent measurement.
+  .PARAMETER Resolution
+  Since there is no official documentation from SolarWinds, I beleive this parameter only applies to the perfstack UI when returning measurements.
+  .PARAMETER StartDate
+  Sepecify the start date and time range to retrieve measurements from. EndDate is required with this parameter. A valid date time is required.
+  .PARAMETER EndDate
+  Sepecify the end date and time range to retrieve measurements from. StartDate is required with this parameter. A valid date time is required.
+#>
+
+Function Get-SWMeasurement{
+    [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Low',DefaultParametersetName='ParamDefault')]
+    param(
+        [Parameter(Mandatory=$true,ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [ValidateNotNull()]
+        [Alias('Server')]
+        [Alias('SolarWindsServer')]
+        [string]$ServerName,
+        
+        [Parameter(Mandatory=$true,ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [ValidateNotNull()]
+        [Microsoft.PowerShell.Commands.WebRequestSession]$WebSession,
+
+        [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [Alias('Port')]
+        [int]$ServerPort = '443',
+
+        [Parameter(Mandatory=$true,ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True,ParameterSetName = 'ParamEntity')]
+        [ValidateNotNull()]
+        [string]$EntityId,
+
+        [Parameter(Mandatory=$true,ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True,ParameterSetName = 'ParamMetric')]
+        [ValidateNotNull()]
+        [string]$MetricId,
+
+        [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [ValidateNotNull()]
         [int]$Count,
 
         [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
         [ValidateNotNull()]
         [int]$Resolution,
 
-        [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True,ParameterSetName = 'ParamDate')]
         [ValidateNotNull()]
         [datetime]$StartDate,
 
-        [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True,ParameterSetName = 'ParamDate')]
         [ValidateNotNull()]
         [datetime]$EndDate
 
@@ -407,8 +512,14 @@ Function Get-SWEntityMetrics{
         #Adding Parameters to URIParams
         If ($PSBoundParameters.ContainsKey('Count')){$URIParams.add('Count', $Count)}
         If ($PSBoundParameters.ContainsKey('Resolution')){$URIParams.add('Resolution', $Resolution)}
-        If ($StartDate){$URIParams.add('StartDate', $StartDate)}
-        If ($EndDate){$URIParams.add('EndDate', $EndDate)}
+        If ($StartDate){
+            $Start = Get-Date $StartDate -format "yyyy-MM-ddTHH:mm:ss:fffZ"
+            $URIParams.add('StartDate', $Start)
+        }
+        If ($EndDate){
+            $End = Get-Date $EndDate -format "yyyy-MM-ddTHH:mm:ss:fffZ"
+            $URIParams.add('EndDate', $End)
+        }
 
         #Format URIParams to single line
         $URIParams = ($URIParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)"}) -join '&'
@@ -426,7 +537,6 @@ Function Get-SWEntityMetrics{
             If ($pscmdlet.ShouldProcess($URI)){
                 $Request = Invoke-RestMethod -Method Get -Uri $URI -ContentType 'application/json' -WebSession $WebSession
             }
-
         }
         catch{
             Write-Error $_

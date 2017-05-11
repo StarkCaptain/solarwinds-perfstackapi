@@ -204,36 +204,27 @@ Function New-SWSession {
   $WebSession | Get-SWEntities
   .EXAMPLE
   The below examples work with returning a limited number of records using the Length and Offset parameters
-
   $WebSession | Get the first 50 entities 
   $WebSession | Get-SWEntities -Length 50
-
   Get the first 50 entities with an offset of 2
   $WebSession | Get-SWEntities -Length 50 -Offset 2
   .EXAMPLE
   The below examples work with returning a entities based on a type.
-
   Get the first 10 entities that are nodes 
   $WebSession | Get-SWEntities -type Orion.Nodes
-
   Get all entities that are nodes
   $WebSession | Get-SWEntities -type Orion.Nodes -Length 0
-
   Get all entities that are Exchange APM Applications
   $WebSession | Get-SWEntities -type Orion.APM.Exchange.Application
   .EXAMPLE
   Get all entities that have a displayname of test.test.local
   $WebSession | Get-SWEntities -DisplayName test.test.local
-
   Get all entities that have a displayname beginning with test
   $WebSession | Get-SWEntities -DisplayName test%
-
   .EXAMPLE
   The below examples work with returning a entities based on a status. 
-
   Get the first 10 entities that are down
   $WebSession | Get-SWEntities -status 2
-
 #>
 
 Function Get-SWEntities{
@@ -343,194 +334,105 @@ Function Get-SWEntities{
 
 <#
   .SYNOPSIS
-  Gets a list of node related metrics 
+  Gets a list of Entity Metrics 
   .DESCRIPTION
-  Returns a list of all metrics from the current node. 
+  Gets a list of Entity Metrics from the entities/metrics API endpoint. You can also retrieve current measurements for each metric
   .PARAMETER ServerName
   The solarwinds FQDN servername. 
   .PARAMETER WebSession
-  An existing Microsoft.PowerShell.Commands.WebRequestSession. Use the New-SolarWindsSession to generate a web session
-  .PARAMETER NodeID
-  The NodeID of the Node you want to retrieve metrics from. This needs to be in the API format. 0_Orion.Nodes_NodeID where NodeID is the NodeID number (0_Orion.Nodes_2055)
+  An existing Microsoft.PowerShell.Commands.WebRequestSession. Use the New-SWSession to generate a web session
   .PARAMETER ServerPort
   Only required if your solarwinds website is not running on the default port of 443
-  .EXAMPLE
-  Get-SWNodeMetrics -ServerName solarwinds.f5net.com -WebSession $WebSession -NodeID 0_Orion.Nodes_2055
+  .PARAMETER EntityId
+  .PARAMETER Resolution
+  .PARAMETER StartDate
+  .PARAMETER EndDate
+
 #>
-Function Get-SWNodeMetrics{
-    [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Low',DefaultParametersetName='ParamDefault')]
+
+Function Get-SWEntityMetrics{
+    [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Low')]
     param(
-        [Parameter(Mandatory=$false,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True)]
+        [Parameter(Mandatory=$true,ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
         [ValidateNotNull()]
         [Alias('Server')]
         [Alias('SolarWindsServer')]
         [string]$ServerName,
         
-        [Parameter(Mandatory=$false,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True)]
-        [Alias('Port')]
-        [string]$ServerPort = '443',
-
-        [Parameter(Mandatory=$false,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True)]
+        [Parameter(Mandatory=$true,ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
         [ValidateNotNull()]
         [Microsoft.PowerShell.Commands.WebRequestSession]$WebSession,
 
-        [Parameter(Mandatory=$True)]
-        [ValidateNotNull()]
-        [string]$NodeID,
+        [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [Alias('Port')]
+        [int]$ServerPort = '443',
 
-        [Alias('Path')]
-        [string]$Endpoint = 'metrics/'
+        [Parameter(Mandatory=$true,ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [ValidateNotNull()]
+        [string]$EntityId,
+
+        [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [ValidateNotNull()]
+        [int]$Count,
+
+        [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [ValidateNotNull()]
+        [int]$Resolution,
+
+        [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [ValidateNotNull()]
+        [datetime]$StartDate,
+
+        [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)]
+        [ValidateNotNull()]
+        [datetime]$EndDate
 
     )
 
     begin {
-
+       
+        # Originally had the Endpoint cleanup up in here, however ValueFromPipelineByPropertyName, ValueFromPipeline, and ParameterSets do not get proccessed in the begin block. 
+        # Also Didn't feel like going through the trouble of creating a $InputObject, leaving this in place for notes
     }
 
     process {
-        
-        #Cleanup Path Variable
-        $EndPoint = ($EndPoint + '/').Replace('//','/')
 
-        Write-Verbose 'Formatting ServerName to Base solarwinds address for establishing a session'
-        
-        $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/entities/$NodeID/$EndPoint"
+        #Cleanup Path Variable
+        $EndPoint = 'entities'
+        $EndPoint = $EndPoint.Replace('//','/')
+
+        Write-Verbose $PSBoundParameters.GetEnumerator()
+        $URIParams = @{} 
+
+        #Adding Parameters to URIParams
+        If ($PSBoundParameters.ContainsKey('Count')){$URIParams.add('Count', $Count)}
+        If ($PSBoundParameters.ContainsKey('Resolution')){$URIParams.add('Resolution', $Resolution)}
+        If ($StartDate){$URIParams.add('StartDate', $StartDate)}
+        If ($EndDate){$URIParams.add('EndDate', $EndDate)}
+
+        #Format URIParams to single line
+        $URIParams = ($URIParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)"}) -join '&'
+        If ($URIParams){$URIParams = "?$URIParams"}
+
+        Write-Verbose $URIParams
+
+        $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$EndPoint/$EntityId/metrics/$URIParams"
 
         #Cleanup URI  Variable
         $URI  = "https://$($URI.Replace('//','/'))"
-
+        
         try{
             Write-Verbose "Attempting Connection to $URI"
             If ($pscmdlet.ShouldProcess($URI)){
-
                 $Request = Invoke-RestMethod -Method Get -Uri $URI -ContentType 'application/json' -WebSession $WebSession
             }
 
         }
         catch{
-
             Write-Error $_
-
         }
-
     }
     End{
-
         return $Request
     }
-
 }
-
-<#
-  .SYNOPSIS
-  Gets a statistics from a metric
-  .DESCRIPTION
-  Returns a list of all statisics from a metric object
-  .PARAMETER ServerName
-  The solarwinds FQDN servername. 
-  .PARAMETER WebSession
-  An existing Microsoft.PowerShell.Commands.WebRequestSession. Use the New-SolarWindsSession to generate a web session
-  .PARAMETER MetricID
-  The NodeID of the Node you want to retrieve metrics from. This needs to be in the API format. 0_Orion.Nodes_NodeID where NodeID is the NodeID number (0_Orion.Nodes_2055)
-  .PARAMETER Latest
-  Gets the last available measurement
-  .PARAMETER StartTime
-  Specify series of measurements to retrive based on the timeframe. Must be a date time object. (For Future Use Not Yet Implmented)
-.PARAMETER EndTime
-  Specify series of measurements to retrive based on the timeframe. Must be a date time object. (For Future Use Not Yet Implmented)
-  .PARAMETER Endpoint
-  Specify the API Endpoint Path. (default is /metrics)
-  .PARAMETER ServerPort
-  Only required if your solarwinds website is not running on the default port of 443
-  .EXAMPLE
-  Get-SWMeasurement -ServerName solarwinds.f5net.com -WebSession $WebSession -MetricID 0_Orion.Nodes_3341-Orion.CPULoad.AvgLoad
-  .EXAMPLE
-  Get-SWMeasurement -ServerName solarwinds.f5net.com -WebSession $WebSession -MetricID 0_Orion.Nodes_3341-Orion.CPULoad.AvgLoad -Latest
-    .EXAMPLE
-  Get-SWMeasurement -ServerName solarwinds.f5net.com -WebSession $WebSession -MetricID 0_Orion.Nodes_3341-Orion.CPULoad.AvgLoad -TimeFrame
-#>
-Function Get-SWMeasurement{
-    [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Low',DefaultParametersetName='ParamDefault')]
-    param(
-        [Parameter(Mandatory=$false,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True)]
-        [ValidateNotNull()]
-        [Alias('Server')]
-        [Alias('SolarWindsServer')]
-        [string]$ServerName,
-        
-        [Parameter(Mandatory=$false,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True)]
-        [Alias('Port')]
-        [string]$ServerPort = '443',
-
-        [Parameter(Mandatory=$false,
-        ValueFromPipeline=$True,
-        ValueFromPipelineByPropertyName=$True)]
-        [ValidateNotNull()]
-        [Microsoft.PowerShell.Commands.WebRequestSession]$WebSession,
-
-        [Parameter(Mandatory=$True)]
-        [ValidateNotNull()]
-        [Alias('id')]
-        [string]$MetricID,
-
-        [switch]$Latest,
-
-        [Alias('Path')]
-        [string]$Endpoint = 'metrics/'
-    )
-
-    begin {
-
-    }
-
-    process {
-
-        #Get Current Date Time in UTC
-        $EndTime = (get-date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-        $StartTime = (get-date).AddHours(-1).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-
-        #Cleanup Path Variable
-        $EndPoint = ($EndPoint + '/').Replace('//','/')
-
-        Write-Verbose 'Formatting ServerName to Base solarwinds address for establishing a session'
-        
-        $URI = "$($ServerName):$($ServerPort)/$global:APIRootPath/$EndPoint/$MetricID/"
-
-        #Cleanup URI  Variable
-        $URI  = "https://$($URI.Replace('//','/'))/"
-
-        try{
-            Write-Verbose "Attempting Connection to $URI"
-            If ($pscmdlet.ShouldProcess($URI)){
-
-                $Request = Invoke-RestMethod -Method Get -Uri $URI -ContentType 'application/json' -WebSession $WebSession
-            }
-
-        }
-        catch{
-
-            Write-Error $_
-
-        }
-
-    }
-    End{
-        If($Latest){
-            $Request = $Request[0]
-        }
-
-        return $Request
-    }
-
-}
-

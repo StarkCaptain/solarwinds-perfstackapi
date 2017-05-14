@@ -1,22 +1,13 @@
 # solarwinds-api2
 
-# Work in Progress
+# Description
 
-# Project Title
-
-PowerShell Module that interfaces with the solarwinds orion api2 endpoint (/api2 or /api2/perfstack)
+PowerShell Module that interfaces with the solarwinds orion api2 perfstack endpoint (/api2/perfstack)
 
 ## Getting Started
 
-ToDo
-
-## Prerequisites
-
-ToDo
-
-## Installing
-
-ToDo
+Download the SolarWinds-PerfStackAPI.psm1
+Import-Module SolarWinds-PerfStackAPI.psm1
 
 ## Contributing
 

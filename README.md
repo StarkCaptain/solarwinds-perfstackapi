@@ -1,4 +1,4 @@
-# solarwinds-api2
+# solarwinds-perfstackapi
 
 # Description
 

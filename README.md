@@ -6,7 +6,7 @@ PowerShell Module that interfaces with the solarwinds orion api2 perfstack endpo
 
 ## Prerequisites
 
-You need to enable basic authentication on the api2 virtual directory in IIS on any web servers hosting the solarwinds website. 
+You need to enable basic authentication on the api2 virtual directory in IIS on all web servers hosting the solarwinds website. 
 
 ## Getting Started
 

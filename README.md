@@ -13,6 +13,9 @@ You need to enable basic authentication on the api2 virtual directory in IIS on 
 Download the SolarWinds-PerfStackAPI.psm1
 Import-Module SolarWinds-PerfStackAPI.psm1
 
+Basic Examples
+https://github.com/StarkCaptain/solarwinds-perfstackapi/wiki/Examples
+
 Functions
 https://github.com/StarkCaptain/solarwinds-perfstackapi/wiki/Functions
 

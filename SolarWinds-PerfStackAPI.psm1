@@ -50,7 +50,7 @@ function Enable-TrustAllCertificates {
   .PARAMETER Password
   Your password in clear text
   .EXAMPLE
-  Get-BasicAuthCreds -Username 'domain\username' -Password 'P@ssw0rd'
+  New-BasicAuthCreds -Username 'domain\username' -Password 'P@ssw0rd'
 #>
 
 Function New-SWBasicAuthCreds {

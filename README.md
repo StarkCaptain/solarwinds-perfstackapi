@@ -9,6 +9,9 @@ PowerShell Module that interfaces with the solarwinds orion api2 perfstack endpo
 Download the SolarWinds-PerfStackAPI.psm1
 Import-Module SolarWinds-PerfStackAPI.psm1
 
+Functions
+https://github.com/StarkCaptain/solarwinds-perfstackapi/wiki/Functions
+
 ## Contributing
 
 1. Fork it!
